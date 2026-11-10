@@ -1,32 +1,44 @@
-# ECHO//LOOP
+# ECHO//LOOP — PARADOX PROTOCOL
 
-Arcade de supervivencia temporal para Build & Play (Open2.io). Controlas una esfera; tras `τ` segundos aparecen **ECHOS** que reproducen exactamente tu recorrido pasado:
+> Your past is not chasing you. It is completing what you started.
 
-```
-E_i(t) = P(t - τ_i)        τ = 6 s, 13 s, 21 s
-```
+Puzzle arcade temporal para Build & Play (Open2.io). Un único objetivo: **estabilizar el núcleo**.
 
-Sin IA: los ECHOS no persiguen, no corrigen ni aceleran; solo consultan el historial real del jugador.
+## Cómo se juega
+
+`E_i(t) = P(t - τ_i)` con τ = 6, 13 y 21 s. El ECHO repite tu recorrido; no lo modifica.
+
+1. **Rutea.** La compuerta violeta lo vuelve AISLANTE y la cian, CONDUCTOR. La trayectoria no cambia. Tú no tienes fase: la compuerta actúa cuando el ECHO reproduce el cruce.
+2. **Sincroniza.** El núcleo carga a `(k-1)` por segundo con dos o más nodos a la vez. El nodo amarillo solo cuenta 2 s cada 8.
+3. **Arriesga.** Dos ECHOS conductores en el mismo nodo triplican la carga durante 1.2 s. Si siguen, el núcleo se descarga.
+
+Si un ECHO te toca, el tiempo se rompe.
+
+Cinco niveles. El 5 usa solo los ECHOS de 6 s y 13 s: el de 21 s no entra, porque una partida resuelta termina antes y su cuenta atrás confundía. Cada nivel se puntúa por tiempo (S/A/B/C) y guarda el mejor (`localStorage`, clave `el2`).
 
 ## Controles
 
-- Mover: `WASD` o flechas (en táctil, arrastrar sobre el canvas).
-- `F3`: diagnóstico (tiempo, posición, muestras, estado/posición/retraso/`tq` de cada ECHO).
-- `R` o botón: reiniciar tras la derrota.
+| Acción | Tecla |
+|---|---|
+| Mover | `WASD` / flechas (táctil: arrastrar) |
+| Pausa | `P` / `Esc` (también al ocultar la pestaña) |
+| Reiniciar nivel | `R` |
+| Silencio | `M` (el botón VOL cicla el volumen) |
+| Diagnóstico | `F3` |
 
 ## Ejecutar
 
-Página estática, sin compilación. Abre `index.html` o sirve la carpeta con cualquier servidor estático.
+Página estática sin compilación: abre `index.html` o sirve la carpeta con cualquier servidor estático.
 
-Experimentos por URL: `?dur=30` (duración activa de cada ECHO) y `?on=100` (ECHOS habilitados).
-Valores por defecto en `CFG` al inicio de `game.js` (`dur: 12`, `delays: [6, 13, 21]`, `cap: 1500`).
+Parámetros de URL para pruebas: `?lv=3` abre directamente el nivel 3; `?dur=30` hace que los ECHOS expiren tras 30 s activos (por defecto no expiran en los niveles).
 
 ## Arquitectura (`game.js`)
 
-- `TemporalHistory`: buffer circular (`Float64Array` tiempo, `Float32Array` x/y; 1500 muestras a 60 Hz ≈ 25 s) con consulta interpolada linealmente.
-- `createSim`: simulación determinista a paso fijo 1/60 (jugador, arena, ECHOS WAITING/ACTIVE/EXPIRED/DISABLED, colisión circular). El reloj es un contador entero de ticks (sin deriva) y no usa temporizadores.
-- Navegador (`boot`): acumulador de tiempo con máximo de 5 pasos por frame, pausa al ocultar la pestaña, render Canvas 2D, HUD y diagnóstico.
+- `TemporalHistory`: buffer circular (1500 muestras a 60 Hz, `Float64Array` tiempo + `Float32Array` x/y) con consulta interpolada linealmente.
+- `createSim`: simulación determinista a paso fijo 1/60 con reloj entero de ticks (sin deriva). Jugador (velocidad constante, diagonal normalizada, arena circular), ECHOS (WAITING/ACTIVE/EXPIRED/DISABLED), colisión circular, resonancia de nodos y carga del núcleo. Emite eventos (`ev`) que el navegador convierte en efectos y sonido, sin afectar a la simulación.
+- `boot`: acumulador con máximo de 5 pasos por frame, render Canvas 2D (arena, núcleo, ECHOS, estelas, partículas en pools), audio procedural Web Audio, HUD y diagnóstico.
 - Un ECHO con `τ` mayor que la cobertura del buffer (~24,98 s) queda `DISABLED`.
+- La velocidad del jugador es instantánea a propósito: el ECHO repite posiciones, y la precisión del recorrido es la mecánica. El "feel" se consigue con estiramiento, estelas y partículas.
 
 ## Pruebas
 
@@ -34,7 +46,7 @@ Valores por defecto en `CFG` al inicio de `game.js` (`dur: 12`, `delays: [6, 13,
 node tests/sim.test.js
 ```
 
-Sin dependencias. Compara cada posición de ECHO contra una referencia independiente con trayectorias circular, rectangular, zigzag, sinusoidal, quieto, cambios bruscos y contra los límites, con buffer lleno y sobrescrito, retrasos enteros y fraccionarios, ciclo de vida, colisión y reinicio.
+Sin dependencias. Cubre historial, interpolación y sobrescritura del buffer; reproducción exacta de ECHOS con trayectorias circular, rectangular, zigzag, sinusoidal, quieto, cambios bruscos y contra los límites; retrasos enteros y fraccionarios; ciclo de vida; colisión determinista; reinicio; límite circular; geometría de niveles; carga de resonancia (`k=1,2,3`); victoria; determinismo; y un bot que verifica que **cada nivel es ganable**.
 
 ## Despliegue en Vercel
 
@@ -42,14 +54,13 @@ Framework Preset: **Other** · Root Directory: raíz · Build/Install Command: v
 
 ## Presupuesto de descarga (límite 32 KB, objetivo 28 KB)
 
-Medido en local (Chrome, caché desactivada, recarga completa, servidor con gzip):
+Medido en local (Chrome, caché desactivada, recarga completa, servidor con brotli, 3 solicitudes, sin favicon externo):
 
 | Recurso | Original (B) | Transferido (B) |
 |---|---|---|
-| `index.html` | 845 | 811 |
-| `style.css` | 2154 | 1271 |
-| `game.js` | 14154 | 5604 |
-| Favicon (data URI) | 0 | 0 |
-| **Total (3 solicitudes)** | **17153** | **7686** |
+| `index.html` | 2166 | 1139 |
+| `style.css` | 7767 | 2513 |
+| `game.js` | 40225 | 12352 |
+| **Total** | **50158** | **16004** |
 
-Pendiente: repetir la medición en la URL desplegada de Vercel.
+Pendiente: repetir la medición en la URL desplegada en Vercel.
