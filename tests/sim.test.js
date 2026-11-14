@@ -1,7 +1,7 @@
 'use strict';
 // Ejecutar: node tests/sim.test.js   (sin dependencias; no se carga desde el navegador)
 const assert = require('assert');
-const { TemporalHistory, createSim, DT } = require('../game.js');
+const { TemporalHistory, createSim, DT } = require(process.env.GAME || '../src/game.js');
 
 let checks = 0, tests = 0;
 const near = (a, b, m) => { checks++; assert(Math.abs(a - b) < 2e-3, `${m}: ${a} != ${b}`); };
@@ -151,7 +151,7 @@ for (const [dn, delays] of Object.entries(delaysSets))
 })();
 
 /* ======================= Resonancia (PARADOX ENGINE) ======================= */
-const { LEVELS, CFG } = require('../game.js');
+const { LEVELS, CFG } = require(process.env.GAME || '../src/game.js');
 const steer = (s, tx, ty) => { const dx = tx - s.px, dy = ty - s.py, d = Math.hypot(dx, dy); return d < 3 ? [0, 0, true] : [dx / d, dy / d, false]; };
 const toward = (s, n, max = 600) => { for (let i = 0; i < max && !s.over; i++) { const [ix, iy, ok] = steer(s, n.x, n.y); if (ok) return true; s.step(ix, iy); } return false; };
 const sameSim = (a, b) => a.tick === b.tick && a.px === b.px && a.py === b.py && a.charge === b.charge && a.k === b.k && a.over === b.over && a.won === b.won;
